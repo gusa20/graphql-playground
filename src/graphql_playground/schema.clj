@@ -1,6 +1,7 @@
 (ns graphql-playground.schema
   (:require [com.walmartlabs.lacinia.schema :as schema]
             [com.walmartlabs.lacinia.util :as util]
+            [com.stuartsierra.component :as component]
             [clojure.edn :as edn]
             [clojure.java.io :as io]))
 
@@ -29,7 +30,7 @@
           (get data k)))
 
 (defn resolver-map
-  []
+  [component]
   (let [cgg-data (-> (io/resource "cgg-data.edn")
                      slurp
                      edn/read-string)
@@ -39,9 +40,21 @@
      :BoardGame/designers (partial resolve-board-game-designers designers-map)
      :Designer/games (partial resolve-designer-games games-map)}))
 
-(defn load-schema []
+(defn load-schema [component]
   (-> (io/resource "cgg-schema.edn")
       slurp
       edn/read-string
-      (util/attach-resolvers (resolver-map))
+      (util/attach-resolvers (resolver-map component))
       schema/compile))
+
+(defrecord SchemaProvider [schema]
+  component/Lifecycle
+  (start [this]
+    (assoc this :schema (load-schema this)))
+
+  (stop [this]
+    (assoc this :schema nil)))
+
+(defn new-schema-provider
+  []
+  {:schema-provider (map->SchemaProvider {})})
